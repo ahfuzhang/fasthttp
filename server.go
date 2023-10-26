@@ -2099,7 +2099,7 @@ func (s *Server) serveConnCleanup() {
 	atomic.AddUint32(&s.concurrency, ^uint32(0))
 }
 
-func (s *Server) serveConn(c net.Conn) (err error) {
+func (s *Server) serveConn(c net.Conn) (err error) { // 接受数据的核心代码
 	defer s.serveConnCleanup()
 	atomic.AddUint32(&s.concurrency, 1)
 
@@ -2356,7 +2356,7 @@ func (s *Server) serveConn(c net.Conn) (err error) {
 
 		// If a client denies a request the handler should not be called
 		if continueReadingRequest {
-			s.Handler(ctx)
+			s.Handler(ctx) // 这里回调用户配置的接口
 		}
 
 		timeoutResponse = ctx.timeoutResponse
@@ -2372,7 +2372,7 @@ func (s *Server) serveConn(c net.Conn) (err error) {
 
 		hijackHandler = ctx.hijackHandler
 		ctx.hijackHandler = nil
-		hijackNoResponse = ctx.hijackNoResponse && hijackHandler != nil
+		hijackNoResponse = ctx.hijackNoResponse //hijackNoResponse = ctx.hijackNoResponse && hijackHandler != nil
 		ctx.hijackNoResponse = false
 
 		if writeTimeout > 0 {

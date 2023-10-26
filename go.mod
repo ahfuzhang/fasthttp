@@ -2,6 +2,11 @@ module github.com/valyala/fasthttp
 
 go 1.20
 
+replace (
+	//github.com/valyala/fasthttp => /Users/fuchunzhang/code/github.com/ahfuzhang/fasthttp
+	github.com/klauspost/compress => /Users/fuchunzhang/code/github.com/ahfuzhang/compress
+)
+
 require (
 	github.com/andybalholm/brotli v1.0.5
 	github.com/klauspost/compress v1.16.3

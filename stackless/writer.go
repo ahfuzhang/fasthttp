@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/klauspost/compress/gzip"
+
 	"github.com/valyala/bytebufferpool"
 )
 
@@ -30,16 +32,16 @@ type NewWriterFunc func(w io.Writer) Writer
 // Writers that use a lot of stack space may be wrapped into stackless writer,
 // thus saving stack space for high number of concurrently running goroutines.
 func NewWriter(dstW io.Writer, newWriter NewWriterFunc) Writer {
-	w := &writer{
+	w := &StacklessWriter{
 		dstW: dstW,
 	}
 	w.zw = newWriter(&w.xw)
 	return w
 }
 
-type writer struct {
-	dstW io.Writer
-	zw   Writer
+type StacklessWriter struct {
+	dstW io.Writer // 写数据的目的地址
+	zw   Writer    // 猜测是用于压缩的
 	xw   xWriter
 
 	err error
@@ -47,6 +49,14 @@ type writer struct {
 
 	p  []byte
 	op op
+}
+
+func (s *StacklessWriter) GetGzipWriter() *gzip.Writer {
+	w, ok := s.zw.(*gzip.Writer)
+	if ok {
+		return w
+	}
+	return nil
 }
 
 type op int
@@ -58,28 +68,28 @@ const (
 	opReset
 )
 
-func (w *writer) Write(p []byte) (int, error) {
+func (w *StacklessWriter) Write(p []byte) (int, error) {
 	w.p = p
 	err := w.do(opWrite)
 	w.p = nil
 	return w.n, err
 }
 
-func (w *writer) Flush() error {
+func (w *StacklessWriter) Flush() error {
 	return w.do(opFlush)
 }
 
-func (w *writer) Close() error {
+func (w *StacklessWriter) Close() error {
 	return w.do(opClose)
 }
 
-func (w *writer) Reset(dstW io.Writer) {
+func (w *StacklessWriter) Reset(dstW io.Writer) {
 	w.xw.Reset()
 	w.do(opReset) //nolint:errcheck
 	w.dstW = dstW
 }
 
-func (w *writer) do(op op) error {
+func (w *StacklessWriter) do(op op) error {
 	w.op = op
 	if !stacklessWriterFunc(w) {
 		return errHighLoad
@@ -101,7 +111,7 @@ var errHighLoad = errors.New("cannot compress data due to high load")
 var stacklessWriterFunc = NewFunc(writerFunc)
 
 func writerFunc(ctx interface{}) {
-	w := ctx.(*writer)
+	w := ctx.(*StacklessWriter)
 	switch w.op {
 	case opWrite:
 		w.n, w.err = w.zw.Write(w.p)
